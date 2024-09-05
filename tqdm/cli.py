@@ -15,6 +15,25 @@ log = logging.getLogger(__name__)
 
 
 def cast(val, typ):
+    """
+    Converts a given value into a specified type, handling various types including
+    string, boolean, integer, and floating-point numbers. It supports type casting
+    for 'chr' type and handles multiple possible types with 'or' operator.
+
+    Args:
+        val (Union[bool, str, int, float, bytes]): Expected to be an input value
+            that needs to be cast into a specified data type.
+        typ (str | bool): A string representing the data type to which the given
+            value should be casted, possibly containing multiple types separated
+            by " or ".
+
+    Returns:
+        Union[None,bool,int,float,str,bytes]: Casted or converted from a given
+        input value and expected data type. It handles various types like bool,
+        chr, int, float, str, etc., by attempting to directly convert the input
+        into the specified type.
+
+    """
     log.debug((val, typ))
     if " or " in typ:
         for t in typ.split(" or "):
@@ -55,13 +74,27 @@ def cast(val, typ):
 def posix_pipe(fin, fout, delim=b'\\n', buf_size=256,
                callback=lambda float: None, callback_len=True):
     """
-    Params
-    ------
-    fin  : binary file with `read(buf_size : int)` method
-    fout  : binary file with `write` (and optionally `flush`) methods.
-    callback  : function(float), e.g.: `tqdm.update`
-    callback_len  : If (default: True) do `callback(len(buffer))`.
-      Otherwise, do `callback(data) for data in buffer.split(delim)`.
+    Reads data from a file input stream and writes it to a file output stream,
+    optionally buffering at a specified delimiter. It  provides progress callbacks
+    for tracking data transfer.
+
+    Args:
+        fin (io.IOBase): Read from to transfer data through the pipe.
+        fout (io.IOBase): Intended to be an output file object. It should have a
+            write method, represented by `fp_write`, which can be used for writing
+            data to it.
+        delim (bytes | str): 32 bit by default, it represents the delimiter used
+            to split data when reading from the input file. It can be an empty
+            bytes object or string.
+        buf_size (int): 256 by default. It specifies the maximum number of bytes
+            that can be read from the input file at one time.
+        callback (Callable[[float], None]): Initialized with a default value lambda
+            function that takes one argument, always returning None. It is expected
+            to be called at specific points during the pipe's execution.
+        callback_len (bool): True by default, indicating whether the callback
+            should be called with the length of each segment (True) or with the
+            segments themselves (False).
+
     """
     fp_write = fout.write
 
@@ -155,10 +188,17 @@ CLI_EXTRA_DOC = r"""
 
 def main(fp=sys.stderr, argv=None):
     """
-    Parameters (internal use only)
-    ---------
-    fp  : file-like object for tqdm
-    argv  : list (default: sys.argv[1:])
+    Implements a command-line interface for the `tqdm` library, allowing users to
+    customize and control progress bars for tasks such as file reading or writing,
+    while also providing options for output formatting and verbosity.
+
+    Args:
+        fp (Union[file-like object, str, int]): Used to specify where progress bar
+            output should be written. It defaults to `sys.stderr`.
+        argv (Sequence[str]): Used to pass command line arguments to the script.
+            If not provided, it defaults to `sys.argv[1:]`. It is later processed
+            and split using regular expressions.
+
     """
     if argv is None:
         argv = sys.argv[1:]
@@ -250,8 +290,28 @@ Options:
         comppath = tqdm_args.pop('comppath', None)
         if tqdm_args.pop('null', False):
             class stdout(object):
+                """
+                Defines a static method `write` that does nothing when called,
+                effectively overriding the standard behavior of writing to the
+                console. This can be used for testing or debugging purposes where
+                output is suppressed.
+
+                """
                 @staticmethod
                 def write(_):
+                    """
+                    Serves as an interface to allow output operations on the
+                    standard output stream, but it does not implement any actual
+                    writing functionality and simply passes through its arguments
+                    without effecting any changes or actions.
+
+                    Args:
+                        _ (Any): Intended to be ignored or not used within the
+                            function, allowing for optional parameters in the
+                            calling function. It is commonly used as a "throwaway"
+                            variable.
+
+                    """
                     pass
         else:
             stdout = sys.stdout
@@ -263,7 +323,20 @@ Options:
             from shutil import copyfile
 
             def cp(name, dst):
-                """copy resource `name` to `dst`"""
+                """
+                Copies a file specified by `name` from either a `files` attribute
+                or a path within the `resources.path` to a destination location
+                `dst`, and logs a message indicating the copied file's new path.
+
+                Args:
+                    name (str): Used to specify the name of a file within the
+                        'tqdm' resources that needs to be copied. It is likely a
+                        filename, not a path.
+                    dst (str): Used to specify the destination file path where the
+                        file will be copied. It appears to represent the full path
+                        of the target file.
+
+                """
                 if hasattr(resources, 'files'):
                     copyfile(str(resources.files('tqdm') / name), dst)
                 else:  # py<3.9
@@ -279,9 +352,27 @@ Options:
             stdout_write = stdout.write
             fp_write = getattr(fp, 'buffer', fp).write
 
+                                   """
+                                   Modifies the behavior of the standard output
+                                   by combining it with a progress bar from `tqdm`.
+                                   It writes input to the file pointer (`fp`) while
+                                   displaying a progress bar for each write operation.
+
+                                   """
             class stdout(object):  # pylint: disable=function-redefined
                 @staticmethod
                 def write(x):
+                    """
+                    Writes data to file or console, depending on the write mode
+                    specified by tqdm's external_write_mode. If set to console,
+                    it calls `fp_write` and `stdout_write`; otherwise, it only
+                    calls `tqdm.external_write_mode`.
+
+                    Args:
+                        x (Union[bytes, str]): Expected to be data that needs to
+                            be written either to the file or to stdout.
+
+                    """
                     with tqdm.external_write_mode(file=fp):
                         fp_write(x)
                     stdout_write(x)
